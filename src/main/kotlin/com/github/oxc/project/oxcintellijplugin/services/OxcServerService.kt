@@ -3,6 +3,10 @@
 package com.github.oxc.project.oxcintellijplugin.services
 
 import com.github.oxc.project.oxcintellijplugin.OxcBundle
+import com.github.oxc.project.oxcintellijplugin.OxcPackage
+import com.github.oxc.project.oxcintellijplugin.extensions.findNearestOxcConfig
+import com.github.oxc.project.oxcintellijplugin.extensions.findNearestPackageJson
+import com.github.oxc.project.oxcintellijplugin.lsp.OxcLspServerDescriptor
 import com.github.oxc.project.oxcintellijplugin.lsp.OxcLspServerSupportProvider
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -11,10 +15,13 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.lsp.api.LspServerManager
 import com.intellij.platform.lsp.api.customization.LspIntentionAction
 import com.intellij.platform.lsp.util.getLsp4jRange
+import java.io.File
 import org.eclipse.lsp4j.CodeActionContext
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.CodeActionTriggerKind
@@ -34,7 +41,7 @@ class OxcServerService(private val project: Project) {
     suspend fun fixAll(document: Document) {
         val manager = FileDocumentManager.getInstance()
         val file = manager.getFile(document) ?: return
-        
+
         fixAll(file, document)
     }
 
@@ -67,8 +74,35 @@ class OxcServerService(private val project: Project) {
         })
     }
 
+    fun createLspServerDescriptor(project: Project, file: VirtualFile): OxcLspServerDescriptor? {
+        val oxc = OxcPackage(project)
+        if (!oxc.isEnabled()) {
+            return null
+        }
+        val configPath = oxc.configPath()
+        val executable = oxc.binaryPath(file) ?: return null
+
+        val projectRootDir = project.guessProjectDir() ?: return null
+        val root: VirtualFile
+        if (configPath?.isNotEmpty() == true) {
+            val configVirtualFile = VirtualFileManager.getInstance().findFileByNioPath(File(configPath).toPath()) ?: return null
+            root = configVirtualFile.findNearestPackageJson(projectRootDir)?.parent ?: return null
+        } else {
+            root = file.findNearestOxcConfig(projectRootDir)?.parent ?: return null
+        }
+
+        return OxcLspServerDescriptor(project, root, executable)
+    }
+
     fun restartServer() {
         LspServerManager.getInstance(project).stopAndRestartIfNeeded(OxcLspServerSupportProvider::class.java)
+    }
+
+    fun ensureServerStarted(file: VirtualFile) {
+        createLspServerDescriptor(project, file)?.let {
+            LspServerManager.getInstance(project)
+                .ensureServerStarted(OxcLspServerSupportProvider::class.java, it)
+        }
     }
 
     fun stopServer() {

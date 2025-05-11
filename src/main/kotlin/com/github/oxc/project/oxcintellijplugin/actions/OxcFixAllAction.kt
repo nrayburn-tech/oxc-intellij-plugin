@@ -19,8 +19,8 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.readText
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
-import kotlinx.coroutines.withTimeout
 import java.io.IOException
+import kotlinx.coroutines.withTimeout
 
 class OxcFixAllAction : AnAction(), DumbAware {
     init {
@@ -44,6 +44,8 @@ class OxcFixAllAction : AnAction(), DumbAware {
                 }).notify(project)
             return
         }
+
+        OxcServerService.getInstance(project).ensureServerStarted(virtualFile)
 
         runWithModalProgressBlocking(project,
             OxcBundle.message("oxc.run.fix.all")) {
