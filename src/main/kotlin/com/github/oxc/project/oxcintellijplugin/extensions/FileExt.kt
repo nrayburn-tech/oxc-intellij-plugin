@@ -6,15 +6,15 @@ import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 
 /**
- * Find the nearest file that satisfies the predicate.
- * If `root` is not null, stops finding at the specified directory.
+ * Find the nearest file that satisfies the predicate that is within `root`.
  */
 private fun VirtualFile.findNearestFile(
     predicate: (file: VirtualFile) -> Boolean,
-    root: VirtualFile? = null,
+    root: VirtualFile,
 ): VirtualFile? {
+    val roots = mutableSetOf(root)
     var cur = this.parent
-    while (cur != null && VfsUtil.isUnder(cur, mutableSetOf(root))) {
+    while (cur != null && VfsUtil.isUnder(cur, roots)) {
         val f = cur.children.find(predicate)
         if (f != null) {
             return f
@@ -32,11 +32,11 @@ fun VirtualFile.isOxfmtConfigFile(): Boolean =
 
 fun VirtualFile.isPackageJsonFile(): Boolean = this.name == "package.json"
 
-fun VirtualFile.findNearestOxfmtConfig(root: VirtualFile? = null): VirtualFile? =
+fun VirtualFile.findNearestOxfmtConfig(root: VirtualFile): VirtualFile? =
     this.findNearestFile({ f -> f.isOxfmtConfigFile() }, root)
 
-fun VirtualFile.findNearestOxlintConfig(root: VirtualFile? = null): VirtualFile? =
+fun VirtualFile.findNearestOxlintConfig(root: VirtualFile): VirtualFile? =
     this.findNearestFile({ f -> f.isOxlintConfigFile() }, root)
 
-fun VirtualFile.findNearestPackageJson(root: VirtualFile? = null): VirtualFile? =
+fun VirtualFile.findNearestPackageJson(root: VirtualFile): VirtualFile? =
     this.findNearestFile({ f -> f.isPackageJsonFile() }, root)

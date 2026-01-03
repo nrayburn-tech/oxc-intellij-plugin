@@ -7,6 +7,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.psi.codeStyle.CodeStyleSettingsManager
 
 class OxfmtConfigWatcher : BulkFileListener {
 
@@ -21,6 +22,7 @@ class OxfmtConfigWatcher : BulkFileListener {
             openProjects.forEach { project ->
                 ApplicationManager.getApplication().invokeLater {
                     if (!project.isDisposed) {
+                        CodeStyleSettingsManager.getInstance(project).notifyCodeStyleSettingsChanged()
                         OxfmtServerService.getInstance(project).restartServer()
                     }
                 }
