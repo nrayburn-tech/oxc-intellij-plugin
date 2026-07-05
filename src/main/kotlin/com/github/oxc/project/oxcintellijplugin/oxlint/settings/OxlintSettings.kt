@@ -2,6 +2,7 @@ package com.github.oxc.project.oxcintellijplugin.oxlint.settings
 
 import com.github.oxc.project.oxcintellijplugin.ConfigurationMode
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintFixKind
+import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintRulesCustomization
 import com.github.oxc.project.oxcintellijplugin.oxlint.settings.OxlintSettingsState.Companion.DEFAULT_EXTENSION_LIST
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.SettingsCategory
@@ -103,6 +104,12 @@ class OxlintSettings(private val project: Project) :
         get() = state.runTrigger
         set(value) {
             state.runTrigger = value
+        }
+
+    var rulesCustomization: MutableMap<String, OxlintRulesCustomization>
+        get() = state.rulesCustomization
+        set(value) {
+            state.rulesCustomization = value
         }
 
     var typeAware

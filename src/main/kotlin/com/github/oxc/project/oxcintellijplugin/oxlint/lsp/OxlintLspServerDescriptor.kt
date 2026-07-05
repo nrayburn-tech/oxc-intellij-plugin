@@ -3,7 +3,9 @@ package com.github.oxc.project.oxcintellijplugin.oxlint.lsp
 import com.github.oxc.project.oxcintellijplugin.OxcTargetRun
 import com.github.oxc.project.oxcintellijplugin.OxcTargetRunBuilder
 import com.github.oxc.project.oxcintellijplugin.ProcessCommandParameter
+import com.github.oxc.project.oxcintellijplugin.oxlint.AutofixOption
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintPackage
+import com.github.oxc.project.oxcintellijplugin.oxlint.RuleSeverity
 import com.github.oxc.project.oxcintellijplugin.oxlint.settings.OxlintSettings
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
@@ -106,6 +108,18 @@ class OxlintLspServerDescriptor(
                 "disable_nested_config" to settings.disableNestedConfig.toString(),
                 "fix_kind" to settings.fixKind.toLspValue(),
             ),
+            "rulesCustomization" to settings.rulesCustomization.mapValues {
+                val autofix = it.value.autofix == AutofixOption.ENABLED
+                if (it.value.severity == RuleSeverity.UNSET) {
+                    return@mapValues mapOf(
+                        "autofix" to autofix,
+                    )
+                }
+                return@mapValues mapOf(
+                    "autofix" to autofix,
+                    "severity" to it.value.severity.toLspValue(),
+                )
+            },
             "run" to settings.state.runTrigger.toLspValue(),
             "typeAware" to settings.typeAware,
             "unusedDisableDirectives" to settings.state.unusedDisableDirectives.toLspValue(),

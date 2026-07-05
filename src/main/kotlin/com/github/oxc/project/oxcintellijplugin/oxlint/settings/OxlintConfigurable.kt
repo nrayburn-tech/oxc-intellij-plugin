@@ -1,11 +1,14 @@
 package com.github.oxc.project.oxcintellijplugin.oxlint.settings
 
 import com.github.oxc.project.oxcintellijplugin.ConfigurationMode
+import com.github.oxc.project.oxcintellijplugin.oxlint.AutofixOption
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintBundle
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintFixKind
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintPackage
+import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintRulesCustomization
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintRunTrigger
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintUnusedDisableDirectivesSeverity
+import com.github.oxc.project.oxcintellijplugin.oxlint.RuleSeverity
 import com.github.oxc.project.oxcintellijplugin.oxlint.services.OxlintServerService
 import com.intellij.ide.actionsOnSave.ActionsOnSaveConfigurable
 import com.intellij.lang.javascript.JavaScriptBundle
@@ -13,10 +16,13 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.ui.ContextHelpLabel
+import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBTextField
+import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.BottomGap
 import com.intellij.ui.dsl.builder.MutableProperty
@@ -26,11 +32,16 @@ import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.layout.not
 import com.intellij.ui.layout.selected
+import com.intellij.ui.table.TableView
+import com.intellij.util.ui.ColumnInfo
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.ListTableModel
 import com.intellij.util.ui.UIUtil
+import javax.swing.DefaultCellEditor
 import javax.swing.JCheckBox
 import javax.swing.JRadioButton
 import javax.swing.event.HyperlinkEvent
+import javax.swing.table.TableCellEditor
 
 private const val HELP_TOPIC = "reference.settings.oxc"
 
@@ -253,6 +264,41 @@ class OxlintConfigurable(private val project: Project) :
                 })
             }.enabledIf(!disabledConfiguration.selected)
 
+            row("Rules Customization") {
+                val table = TableView<RuleCustomization>(
+                    ListTableModel(createRuleNameColumn(), createSeverityColumn(),
+                        createAutofixColumn()))
+                table.fillsViewportHeight = true
+                table.isStriped = true
+
+                table.listTableModel.items = ArrayList()
+
+                val toolbarDecorator = ToolbarDecorator.createDecorator(table).setAddAction {
+                    table.listTableModel.addRow(RuleCustomization(AutofixOption.UNSET, "",
+                        RuleSeverity.UNSET))
+                }.setRemoveAction {
+                    val selectedRow = table.selectedRow
+                    if (selectedRow >= 0) {
+                        table.listTableModel.removeRow(selectedRow)
+                    }
+                }
+
+                cell(toolbarDecorator.createPanel()).align(Align.FILL).onApply {
+                    settings.rulesCustomization.clear()
+                    table.listTableModel.items.forEach {
+                        settings.rulesCustomization[it.rule] = OxlintRulesCustomization(it.autofix, it.severity)
+                    }
+                }.onIsModified {
+                    settings.rulesCustomization != table.listTableModel.items.associate {
+                        it.rule to OxlintRulesCustomization(it.autofix, it.severity)
+                    }
+                }.onReset {
+                    table.listTableModel.items = settings.rulesCustomization.map {
+                        RuleCustomization(it.value.autofix, it.key, it.value.severity)
+                    }
+                }
+            }
+
             onApply {
                 if (project.isDefault) {
                     return@onApply
@@ -278,6 +324,110 @@ class OxlintConfigurable(private val project: Project) :
         }
     }
 
+    private fun createAutofixColumn(): ColumnInfo<RuleCustomization, AutofixOption> {
+        return object : ColumnInfo<RuleCustomization, AutofixOption>("Disable Autofix") {
+            override fun getColumnClass(): Class<*> {
+                return AutofixOption::class.java
+            }
+
+            override fun getEditor(item: RuleCustomization?): TableCellEditor {
+                val comboBox = ComboBox(AutofixOption.entries.toTypedArray())
+
+                return DefaultCellEditor(comboBox)
+            }
+
+            override fun isCellEditable(item: RuleCustomization?): Boolean {
+                return true
+            }
+
+            override fun setValue(item: RuleCustomization?, value: AutofixOption?) {
+                if (item != null) {
+                    item.autofix = value ?: AutofixOption.UNSET
+                }
+            }
+
+            override fun valueOf(
+                item: RuleCustomization?): AutofixOption? {
+                if (item == null) {
+                    return null
+                }
+                return item.autofix
+            }
+
+        }
+    }
+
+    private fun createRuleNameColumn(): ColumnInfo<RuleCustomization, String> {
+        return object : ColumnInfo<RuleCustomization, String>("Rule Name") {
+
+            override fun getColumnClass(): Class<*> {
+                return String::class.java
+            }
+
+            override fun getEditor(item: RuleCustomization?): TableCellEditor {
+                val input = JBTextField()
+
+                return DefaultCellEditor(input)
+            }
+
+            override fun isCellEditable(item: RuleCustomization?): Boolean {
+                return true
+            }
+
+            override fun setValue(item: RuleCustomization?, value: String?) {
+                if (item != null) {
+                    item.rule = if (value.isNullOrBlank()) {
+                        ""
+                    } else {
+                        value
+                    }
+                }
+            }
+
+            override fun valueOf(
+                item: RuleCustomization?): String? {
+                if (item == null) {
+                    return null
+                }
+                return item.rule
+            }
+        }
+    }
+
+    private fun createSeverityColumn(): ColumnInfo<RuleCustomization, RuleSeverity> {
+        return object : ColumnInfo<RuleCustomization, RuleSeverity>("Severity") {
+
+            override fun getColumnClass(): Class<*> {
+                return RuleSeverity::class.java
+            }
+
+            override fun getEditor(item: RuleCustomization?): TableCellEditor {
+                val comboBox = ComboBox(RuleSeverity.entries.toTypedArray())
+
+                return DefaultCellEditor(comboBox)
+            }
+
+            override fun isCellEditable(item: RuleCustomization?): Boolean {
+                return true
+            }
+
+            override fun setValue(item: RuleCustomization?, value: RuleSeverity?) {
+                if (item != null) {
+                    item.severity = value ?: RuleSeverity.UNSET
+                }
+            }
+
+            override fun valueOf(
+                item: RuleCustomization?): RuleSeverity? {
+                if (item == null) {
+                    return null
+                }
+                return item.severity
+            }
+        }
+    }
+
+
     private class ConfigurationModeProperty(
         private val settings: OxlintSettings,
         private val mode: ConfigurationMode,
@@ -288,6 +438,20 @@ class OxlintConfigurable(private val project: Project) :
             if (value) {
                 settings.configurationMode = mode
             }
+        }
+    }
+
+    private data class RuleCustomization(var autofix: AutofixOption, var rule: String,
+        var severity: RuleSeverity) : Comparable<RuleCustomization> {
+
+        override fun compareTo(
+            other: RuleCustomization): Int {
+            return RULE_COMPARATOR.compare(this, other)
+        }
+
+        companion object {
+
+            val RULE_COMPARATOR = compareBy<RuleCustomization> { it.rule }
         }
     }
 

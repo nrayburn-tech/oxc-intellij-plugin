@@ -1,6 +1,7 @@
 package com.github.oxc.project.oxcintellijplugin.oxlint.settings
 
 import com.github.oxc.project.oxcintellijplugin.ConfigurationMode
+import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintRulesCustomization
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintRunTrigger
 import com.github.oxc.project.oxcintellijplugin.oxlint.OxlintUnusedDisableDirectivesSeverity
 import com.intellij.openapi.components.BaseState
@@ -30,6 +31,10 @@ class OxlintSettingsState : BaseState() {
     @get:Attribute("flags")
     @get:XMap
     var flags by map<String, String>()
+
+    @get:Attribute("rulesCustomization")
+    @get:XMap
+    var rulesCustomization by map<String, OxlintRulesCustomization>()
 
     @get:Attribute("supportedExtensions")
     var supportedExtensions by list<String>()
